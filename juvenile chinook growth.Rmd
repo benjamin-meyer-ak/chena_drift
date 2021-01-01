@@ -168,7 +168,7 @@ growth.summary.2019 <- fish %>%
   select(Date,General.Area,nFL,meanFL,sdFL,seFL,nWt,meanWt,sdWt,seWt)
 
 # save table to project directory
-write_csv(growth.summary.2019, "output/tables/growth.summary.2019.csv")
+write_csv(growth.summary.2019, "output/tables/fish size/growth.summary.2019.csv")
 
 ```
 
@@ -197,7 +197,7 @@ growth.summary.2020 <- fish %>%
   select(Date,General.Area,nFL,meanFL,sdFL,seFL,nWt,meanWt,sdWt,seWt)
 
 # save table to project directory
-write_csv(growth.summary.2020, "output/tables/growth.summary.2020.csv")
+write_csv(growth.summary.2020, "output/tables/fish size/growth.summary.2020.csv")
 
 ```
 
@@ -249,7 +249,7 @@ growthFL.plot.2019 <- ggplot(data = growth.summary.2019, aes(x = Date, y = meanF
 growthFL.plot.2019
 
 # save figure
-ggsave("output/figures/2019 results/2019FL.png")
+ggsave("output/figures/fish size/2019 results/2019FL.png")
 
 growthWt.plot.2019 <- ggplot(data = growth.summary.2019, aes(x = Date, y = meanWt, color = General.Area)) +
   geom_point() +
@@ -260,7 +260,7 @@ growthWt.plot.2019 <- ggplot(data = growth.summary.2019, aes(x = Date, y = meanW
 growthWt.plot.2019
 
 # save figure
-ggsave("output/figures/2019 results/2019Wt.png")
+ggsave("output/figures/fish size/2019 results/2019Wt.png")
 ```
 
 <br>
@@ -277,7 +277,7 @@ growthFL.plot.2020 <- ggplot(data = growth.summary.2020, aes(x = Date, y = meanF
 growthFL.plot.2020
 
 # save figure
-ggsave("output/figures/2020 results/2020FL.png")
+ggsave("output/figures/fish size/2020 results/2020FL.png")
 
 growthWt.plot.2020 <- ggplot(data = growth.summary.2020, aes(x = Date, y = meanWt, color = General.Area)) +
   geom_point() +
@@ -288,7 +288,7 @@ growthWt.plot.2020 <- ggplot(data = growth.summary.2020, aes(x = Date, y = meanW
 growthWt.plot.2020
 
 # save figure
-ggsave("output/figures/2020 results/2020Wt.png")
+ggsave("output/figures/fish size/2020 results/2020Wt.png")
 ```
 
 <br>
@@ -316,7 +316,7 @@ growthFL.plot.all <- ggplot(data = growth.summary.all, aes(x = yday, y = meanFL,
 growthFL.plot.all
 
 # save figure
-ggsave("output/figures/general results/growthFL.png")
+ggsave("output/figures/fish size/general results/growthFL.png")
 
 # weight
 growthFL.plot.all.wt <- ggplot(data = growth.summary.all, aes(x = yday, y = meanWt, color = General.Area)) +
@@ -331,7 +331,7 @@ growthFL.plot.all.wt <- ggplot(data = growth.summary.all, aes(x = yday, y = mean
 growthFL.plot.all.wt
 
 # save figure
-ggsave("output/figures/general results/growthWt.png")
+ggsave("output/figures/fish size/general results/growthWt.png")
 ```
 
 
@@ -381,7 +381,7 @@ growthFL.plot.all <- ggplot(data = growth.summary.all, aes(x = DOY, y = meanFL, 
 growthFL.plot.all
 
 #save figure
-ggsave("output/figures/general results/Growth FL_all years.png", height = 6, width = 10)
+ggsave("output/figures/fish size/general results/Growth FL_all years.png", height = 6, width = 10)
 
 ```
 
@@ -426,7 +426,7 @@ growthWt.plot.all <- growth.summary.all %>%
 growthWt.plot.all
 
 # save
-ggsave("output/figures/general results/weight_2009_2020.png",height = 5, width = 8)
+ggsave("output/figures/fish size/general results/weight_2009_2020.png",height = 5, width = 8)
 
 
 ```
@@ -449,7 +449,7 @@ growthWt.plot.3yr <- ggplot(data = growth.summary.3yr, aes(x = DOY, y = meanWt, 
   scale_y_continuous(name = "Weight (g)", breaks = c(0:6)) +
   ggtitle("Chena River Juvenile Chinook salmon weights 2009 - 2019")
 growthWt.plot.3yr
-ggsave("output/figures/general results/growth_wt_3yrs.png", height = 6, width = 6)
+ggsave("output/figures/fish size/general results/growth_wt_3yrs.png", height = 6, width = 6)
 
 ```
 

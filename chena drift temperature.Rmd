@@ -1,0 +1,452 @@
+---
+title: "Chena Drift temperature"
+output:
+  html_document: 
+    df_print: paged
+    fig_width: 10
+    fig_height: 6
+    fig_caption: yes
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+editor_options: 
+  chunk_output_type: inline
+---
+Website last updated `r Sys.time()` by Benjamin Meyer (bemeyer@alaska.edu)
+
+<br>
+
+### Introduction
+This document will summarize and plot observed temperature values collected with HOBO TempPro v2 loggers in the Chena River.  Data is primarily from summers 2019-2020.
+
+<br>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# set data source directory
+#knitr:: opts_knit$set(root.dir = "location")
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+```
+
+<br>
+
+```{r initialize script, include=FALSE}
+
+# clear environment
+rm(list=ls())
+
+#require packages
+library(googlesheets)
+library(tidyverse)
+library(hms)
+library(janitor)
+library(lubridate)
+library(anytime)
+library(readxl)
+library(leaflet)
+library(DT)
+
+# set plot theme
+theme_set(theme_bw(12))
+
+```
+
+<br>
+
+### Logger locations
+```{r}
+# make dataframe of coordinates of HOBO sites
+
+
+# create map
+#leaflet(data = coords) %>%
+#  addTiles() %>%  # Add default OpenStreetMap map tiles
+#  fitBounds(-147.9, 65.08,-146.03, 64.7) %>%
+#  addMarkers(~longitude, ~latitude, popup = ~as.character(site), label = ~as.character(site))
+
+```
+
+<br>
+
+### Data import and preparation
+
+#### Import 2019 data
+
+
+```{r}
+# Read in the 2019 temp logger deployment data
+deploy19 <- read_excel("data/Temperature/TempLoggerDeploy.xlsx", sheet = "TempLoggerDeploy2019", col_types = c("text", "numeric", "text", "text", "text", "text", "text", "text", "numeric","numeric","numeric", "numeric", "numeric", "text","text", "text", "text", "text", "text", "text", "text","numeric", "text"))
+
+# Read in temp data from 2019 csv files
+# specify csv folder location
+## note: it would be ideal for this script to not need access to the dropbox account to read in temperature data.  Having some trouble adapting the "for" loop to read in deirectly from the project data/Temperature folder instead.  Revisit.
+csv19 <-  "~/Dropbox/Chena_Data_2020/Chena Drift Project Data_SFR/UAF Chena Drift GitHub Repo/chena_drift/data/Temperature/2019_HOBO_Temperature/csv"
+
+# # Read in one  csv file
+# file <- "10886779.csv"
+# SerialNumber <- str_sub(file, 1, 8)
+# temp1 <- read_csv(paste(logger, ".csv", sep = ""), skip = 2, 
+#                   col_names = c("RecordNumber", "DateTimeText", "Temp"),
+#                   col_types = "icd-----")
+# # Add a column with the logger SN
+# temp2 <- temp1 %>%
+#   mutate(SerialNumber = SerialNumber,
+#          DateTime = mdy_hms(DateTimeText)) %>%
+#   left_join(deploy, by = "SerialNumber")
+
+# Read in all 2019 csv files in csv folder directory
+csvFiles <- list.files(csv19)
+
+# initialize a dataframe to hold all the 2019 temp data
+rawTemp19 <- NULL
+
+# Read in each 2019 csv file and append it to the bottom of the temp dataframe
+for(i in 1:length(csvFiles)) {
+  # specify csv folder location for read-in function (necessary in Markdown files)
+  setwd(csv19) 
+  file <- csvFiles[i]
+  SerialNumber <- str_sub(file, 1, 8)
+  # Read in the csv file
+  thisTemp <- read_csv(file, skip = 2, 
+                    col_names = c("RecordNumber", "DateTimeText", "Temp"),
+                    col_types = "icd-----")
+  # Add a column with the logger SN
+  thisTemp <- thisTemp %>%
+    mutate(SerialNumber = SerialNumber)
+  rawTemp19 <- rbind(rawTemp19, thisTemp)
+}
+
+# Clean up 2019 deployment data -------------
+deploy19 <- deploy19 %>%
+  mutate(DeployDate = mdy(DeployDate),
+         DeployTime = as.hms(DeployTime),
+         RetrieveDate = mdy(RetrieveDate))
+
+# 2019 data: clean up and prep for plotting
+temp19 <- rawTemp19 %>%
+  left_join(deploy19, by = "SerialNumber") %>%
+  
+# received date/time format is error-prone; re-arrange to make unambiguous for conversion to POSIXct class
+  separate(DateTimeText,sep = " ", into = c("Date","Time"), remove = F) %>%
+  separate(Date,sep="/",into=c("month","day","year")) %>%
+  # ensure only 2019 data present
+  filter(year == "19") %>%
+  mutate(Date = date(paste0(paste0("20",year),"-",month,"-",day))) %>%
+  mutate(DateTime = (paste(Date,Time))) %>%
+  mutate(DateTime = anytime(DateTime)) %>%
+  # remove 4 observations at midnight changeover from 2019 to 2020
+  filter(DateTime < "2020-01-01 00:00:00") %>%
+  mutate(Site = factor(Site)) %>%
+  select(FieldSeason, Site, SerialNumber, DateTime, Temp, DeployDate:DownloadComments) %>%
+  filter(!is.na(Site)) %>%
+  # create observation date column
+  mutate(obs_Date = date(DateTime)) %>%
+  # Trim temp readings outside the deployment window
+  filter(obs_Date > DeployDate + days(1)) %>%
+  filter(obs_Date < RetrieveDate - days(1)) %>%
+  # When both loggers recorded temps, average them
+  group_by(Site, DateTime) %>%
+  summarize(Temp = mean(Temp, na.rm = T)) %>%
+  # Specify the mainstem sites
+  # BM 10/1/20 will need to adjust this code to incorporate ID for Headwaters tribs
+  mutate(ChannelType = ifelse(Site == "Third Bridge" | Site == "First Bridge" | 
+                                Site == "Moose Creek Dam" | Site == "Nordale" |
+                                Site == "Loftus Road", "Mainstem",
+                              ifelse(Site == "First Bridge Slough", "Slough", "Tributary")))
+
+```
+
+<br>
+
+set wd back to rproj
+
+#### Import 2020 data 
+```{r}
+### 2020
+# replicate 2019 process for 2020 water temperature data
+
+# Read in the 2020 temp logger deployment data
+deploy20 <- read_excel("data/Temperature/TempLoggerDeploy.xlsx", sheet = "TempLoggerDeploy2020") %>%
+  transform(SerialNumber = as.character(SerialNumber))
+
+# Read in temp data from 2020 csv files
+# specify csv folder location
+csv20 <-  "~/Dropbox/Chena_Data_2020/Chena Drift Project Data_SFR/UAF Chena Drift GitHub Repo/chena_drift/data/Temperature/2020_HOBO_Temperature/csv"
+
+# Read in all 2020 csv files in csv folder directory
+csvFiles <- list.files(csv20)
+
+# initialize a dataframe to hold all the 2020 temp data
+rawTemp20 <- NULL
+
+# Read in each 2020 csv file and append it to the bottom of the temp dataframe
+for(i in 1:length(csvFiles)) {
+  setwd(csv20) 
+  file <- csvFiles[i]
+  SerialNumber <- str_sub(file, 1, 8)
+  # Read in the csv file
+  thisTemp <- read_csv(file, skip = 2, 
+                       col_names = c("RecordNumber", "DateTimeText", "Temp"),
+                       col_types = "icd-----")
+  # Add a column with the logger SN
+  thisTemp <- thisTemp %>%
+    mutate(SerialNumber = SerialNumber)
+  rawTemp20 <- rbind(rawTemp20, thisTemp)
+}
+
+# 2020 data: clean up and prep for plotting
+temp20 <- rawTemp20 %>%
+  left_join(deploy20, by = "SerialNumber") %>%
+  filter(!is.na(Temp)) %>%
+  # received date/time format is error-prone; re-arrange to make unambiguous for conversion to POSIXct class
+  separate(DateTimeText,sep = " ", into = c("Date","Time"), remove = F) %>%
+  separate(Date,sep="/",into=c("month","day","year")) %>%
+  # some old files from 2019 were found on the shuttles
+  filter(year == "20") %>%
+  mutate(Date = date(paste0(paste0("20",year),"-",month,"-",day))) %>%
+  mutate(DateTime = (paste(Date,Time))) %>%
+  mutate(DateTime = anytime(DateTime))%>%
+  
+  select(-month,day,year) %>%
+  mutate(Site = factor(Site)) %>%
+  select(FieldSeason, Site, SerialNumber, DateTime, Temp, DeployDate:DownloadComments) %>%
+  filter(!is.na(Site)) %>%
+  # transform
+  transform(DeployDate = date(DeployDate)) %>%
+  # Trim temp readings outside the deployment window
+  mutate(year = year(DateTime)) %>%
+  #filter(DateTime > DeployDate + days(1)) %>%
+  #filter(DateTime < RetrieveDate - days(1)) %>%
+  # When multiple paired loggers recorded temps, average them
+  group_by(Site, DateTime) %>%
+  summarize(Temp = mean(Temp)) 
+
+## prep for plotting
+# assign each site a ChannelType
+# Read in the 2020 temp logger deployment data
+channeltypes2020 <- read_excel("data/Temperature/TempLoggerDeploy.xlsx", sheet = "ChannelType") %>%
+  transform(SerialNumber = as.character(SerialNumber))
+
+# assign channel types to each 2020 site
+temp20 <- left_join(temp20,channeltypes2020,by = "Site") %>%
+  mutate(day = yday(DateTime),
+         year = year(DateTime)) 
+
+```
+
+
+
+<br>
+
+### Annual plots by site
+
+Examine annual datasets individually to visually scan for signs of logger malfunction or de-watering.
+
+```{r}
+# plot original 2019 data
+temp.faceted.2019 <- ggplot(data = temp19, aes(x = DateTime, y = Temp)) +
+  geom_line() +
+  facet_wrap(. ~ Site) +
+  scale_x_datetime(name = "Date") +
+  scale_y_continuous(name = "Water Temperature (˚C)") +
+  ggtitle("2019 Original Water Temperature Data")
+temp.faceted.2019
+```
+<br>
+
+```{r}
+# plot original 2020 data
+temp20 %>%
+  ggplot(aes(DateTime,Temp)) +
+  geom_point() +
+  facet_wrap(.~Site) +
+  scale_x_datetime(name = "Date") +
+  scale_y_continuous(name = "Water Temperature (˚C)") +
+  ggtitle("2020 Original Water Temperature Data")
+```
+<br>
+
+Both 2019 and 2020 logger data have erroneous data.  Solution: remove data between manually specified dates at specified sites.
+
+<br>
+
+Remove erroneous data from 2019 dataset and re-visualize results
+```{r}
+# read in manually generated 2019 excise table
+excisetemps2019 <- read_excel("data/Temperature/chena_hobos_excise.xlsx", sheet = "2019")
+
+# create table of observations to be removed
+excisetemps2019 <- left_join(temp19,excisetemps2019) %>%
+  filter(DateTime >= DateTime_Start & DateTime <= DateTime_End)
+
+# remove manually identified observations from overall dataset
+temp19 <- anti_join(temp19,excisetemps2019)
+
+# re-visualize results
+temp.faceted.2019 <- ggplot(data = temp19, aes(x = DateTime, y = Temp)) +
+  geom_point(size = 0.5) +
+  facet_wrap(. ~ Site) +
+  # scale_x_datetime(name = "Date") +
+  scale_y_continuous(name = "Water Temperature (˚C)") +
+  ggtitle("2019 Corrected Water Temperature Data")
+temp.faceted.2019
+
+# save
+ggsave("output/figures/temperature/2019_overall.png")
+
+```
+
+
+<br>
+
+Remove erroneous data from 2020 dataset and re-visualize results
+```{r}
+# read in 2020 excise table
+excisetemps2020 <- read_excel("data/Temperature/chena_hobos_excise.xlsx", sheet = "2020")
+
+# create table of observations to be removed
+excisetemps2020 <- left_join(temp20,excisetemps2020) %>%
+  mutate(day = yday(DateTime)) %>%
+  filter(day >= day_start & day <= day_end)
+
+# remove manually identified observations from overall dataset
+temp20 <- anti_join(temp20,excisetemps2020)
+
+# plot corrected data
+temp20 %>%
+  ggplot(aes(DateTime,Temp)) +
+  geom_point(size = 0.5) +
+  facet_wrap(. ~ Site) +
+  # scale_x_datetime(name = "Date") +
+  scale_y_continuous(name = "Water Temperature (˚C)") +
+  ggtitle("2020 Corrected Water Temperature Data")
+
+# save
+ggsave("output/figures/temperature/2020_overall.png")
+
+```
+
+
+*Notes: *
+
+- Logger at "Unburned2" site was found exposed to air because creek had dried up (at unknown date).  Estimated logger exposure date based on sudden increase in daily variability and excised data beyond that date.
+
+- Partial 2020 results missing from Rock Creek, Upper Mastadon Burned, Upper Mastadon Burned, and Cripple Creek due to HOBO shuttle time sync malfunction.  Communicated with Onset customer service.  Technician determined that files were not recoverable due to "invalid delay".  Learned: ensure that HOBO shuttle is freshly launched each time before use.   
+
+Note: Moose Creek Dam 2020 data acquired from data recovery services at Onset.  Found loggers with batteries dead.
+
+<br>
+
+### Results
+
+#### Summary statistics
+
+Calculate summary stats
+```{r}
+# overall 2019-2020 dt
+dt <- bind_rows(temp19,temp20) %>%
+  select(-SerialNumber) %>%
+  bind_rows(temp19) %>%
+  mutate(year = year(DateTime)) %>%
+  group_by(Site,ChannelType,Fire,year) %>%
+  summarize(meanTemp = mean(Temp, na.rm = T),
+            maxTemp = max(Temp, na.rm = T),
+            minTemp = min(Temp, na.rm = T),
+            sdTemp = sd(Temp, na.rm = T))
+
+dt %>%
+  datatable() %>%
+  formatRound(columns=c("meanTemp","maxTemp","minTemp","sdTemp"), digits=2)
+
+# save
+write_csv(dt,"output/tables/temperature/overall_summary.csv")
+```
+<br>
+
+#### Burned vs Unburned Headwaters Tributaries
+
+Compare 2020 burned to unburned sites
+```{r}
+# set theme
+plot_theme <- theme(
+  axis.text = element_text(size = 14),
+  axis.title = element_text(size = 16, face = "bold" ),
+  plot.title = element_text(size = 16, face = "bold"),
+  legend.background = element_blank(),
+  legend.box.background = element_rect(colour = "black"))
+
+# plot corrected data
+# plot A
+temp20 %>%
+  filter(ChannelType == "Headwaters") %>%
+  ggplot(aes(DateTime,Temp, color = Fire)) +
+  geom_point(size = 0.5) +
+  guides(color = guide_legend(override.aes = list(size = 5))) +
+  scale_y_continuous(name = "Water Temperature (˚C)") +
+  xlab("") +
+  scale_fill_discrete(name="Watershed\nCondition") +
+  ggtitle("Headwaters Stream Temperatature") +
+  plot_theme +
+  theme(legend.justification=c(1,1), legend.position=c(1,1))
+
+#save
+ggsave("output/figures/temperature/watertemps2020_all.jpg")
+```
+
+
+
+```{r}
+# plot B
+## set trendlines span
+sp = 0.3
+temp20 %>%
+  filter(ChannelType == "Headwaters") %>%
+  ggplot(aes(DateTime, Temp, fill = Fire)) + 
+  geom_point(aes(color = Fire),size = 0.5, alpha = 0.01) +
+  stat_smooth(data=subset(temp20,Fire=="Burned"),
+                                  method = "lm", se = T, color = "red3", span = sp) +
+  stat_smooth(data=subset(temp20,Fire=="Unburned"),
+                                method = "loess", se = T, color = "green4", span = sp) +
+  scale_color_manual(values=c(Burned="red3",Unburned = "green4")) +
+  xlab("") +
+  scale_y_continuous(name = "Water Temperature (˚C)") +
+  scale_fill_discrete(name="Watershed\nCondition") +
+  theme(legend.justification=c(0,1), legend.position=c(1,0)) +
+  #guides(color = F) +
+  ggtitle("Headwaters Stream Temperatature") +
+  plot_theme
+  
+# save
+ggsave("output/figures/temperature/watertemps2020_all_trendlines.jpg")
+```
+<br>
+
+Working here to modify remaining code to markdown doc.
+
+```{r }
+# join 2019 and 2020 data
+temp <- bind_rows(temp19,temp20) %>%
+  mutate(year = year(DateTime))
+
+# specify location to save save results
+# setwd("./Temperature")
+
+# Plot the data
+(temp.allsites.2019 <- ggplot(data = temp, 
+                              aes(x = DateTime, 
+                                  y = Temp, 
+                                  color = Site,
+                                  linetype = ChannelType)) +
+                                geom_line() +
+    facet_grid(. ~ year, scales = "free_x") +
+  scale_x_datetime(name = "Date") +
+  scale_y_continuous(name = "Water Temperature (˚C)"))
+
+# save
+ggsave("output/figures/temperature/2019_2020_all.png")
+
+```
