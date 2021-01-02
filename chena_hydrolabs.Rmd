@@ -1,0 +1,264 @@
+---
+title: "Chena River Hydrolab Sondes Analysis"
+output:
+  html_document: 
+    df_print: paged
+    fig_width: 10
+    fig_height: 6
+    fig_caption: yes
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+editor_options: 
+  chunk_output_type: inline
+---
+Website last updated `r Sys.time()` by Benjamin Meyer (ben@kenaiwatershed.org)
+
+<br>
+
+### Introduction
+This document will summarize and plot observed turbidity values collected with Hydrolab sondes in the Chena River.  Data is primarily from summers 2019-2020, with some comparisons to data from summers 2008 2009 (Benson et al.), and 2015 (Huntsman and Falke et al).
+
+<br>
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# set data source directory
+#knitr:: opts_knit$set(root.dir = "~Dropbox/Chena_Data_2020/Chena Drift Project Data_SFR/UAF Chena Drift Data/Hydrolab_data/Hydrolab_Raw_Downloads/Excel_Hydrolab_Downloads_2020")
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+```
+
+
+```{r initialize script, include=FALSE}
+
+# clear environment
+rm(list=ls())
+
+#require packages
+library(googlesheets)
+library(tidyverse)
+library(hms)
+library(janitor)
+library(lubridate)
+library(anytime)
+library(readxl)
+library(leaflet)
+
+```
+
+<br>
+
+### Sonde locations
+```{r}
+# make dataframe of coordinates of Hydrolab sites
+site <- c("First Bridge (Upstream of Fires","Mile 28 (Downstream of Fires)")
+latitude <- c(64.89768, 64.87647)
+longitude <- c(-146.41272, -146.73572)
+coords <- data.frame(site,latitude,longitude)
+
+# create map
+leaflet(data = coords) %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  fitBounds(-147.9, 65.08,-146.03, 64.7) %>%
+  addMarkers(~longitude, ~latitude, popup = ~as.character(site), label = ~as.character(site))
+
+```
+
+<br> 
+
+### Data import and preparation
+```{r hydrolab in progress}
+
+# import all mile28 site data
+dir <- "/Users/bmeyer/Dropbox/Chena_Data_2020/Chena Drift Project Data_SFR/UAF Chena Drift Data/Hydrolab_data/Hydrolab_Raw_Downloads/Excel_Hydrolab_Downloads_2020"
+
+# Import all mile28 sonde data
+mile28 <-list.files(path = "data/Hydrolabs/Excel_Hydrolab_Downloads_2020/Mile28",
+               pattern = "*.csv", 
+               full.names = T) %>% 
+    map_df(~read_csv(., col_types = cols(.default = "c"), skip = 12)) %>%
+  filter(!is.na(LoggerID),
+         !is.na(Time),
+         Date != "MMDDYY") %>%
+  separate(Date, sep = "/", into = c("month","day","year")) %>%
+  mutate(year = "2020") %>%
+  mutate(Date = as.Date(paste0(year,"-",month,"-",day))) %>%
+  mutate(DateTime = ymd_hms(paste(Date,Time)))
+
+# import all first bridge site data
+firstbridge <-list.files(path = "data/Hydrolabs/Excel_Hydrolab_Downloads_2020/FirstBridge",
+               pattern = "*.csv", 
+               full.names = T) %>% 
+    map_df(~read_csv(., col_types = cols(.default = "c"), skip = 12)) %>%
+  filter(!is.na(LoggerID),
+         !is.na(Time),
+         Date != "MMDDYY") %>%
+  separate(Date, sep = "/", into = c("month","day","year")) %>%
+  mutate(year = "2020") %>%
+  mutate(Date = as.Date(paste0(year,"-",month,"-",day))) %>%
+  mutate(DateTime = ymd_hms(paste(Date,Time))) %>%
+# remove deployment that only recorded a single observation before failing
+  filter(Date != "2020-09-11")
+
+# bind together dataframes & prep for plotting
+hydrolabs <- bind_rows(mile28,firstbridge) %>%
+  transform(DateTime = round_date(DateTime, "minute")) %>%
+  arrange(DateTime) %>%
+  separate(LoggerID, sep = " ", into = c("a","b","LoggerID")) %>%
+  select(-a,-b,-Circ,-Date,-Time,-IBatt,-LoggerID) %>%
+  gather(key = "Parameter", value = "value",Temp,SpCond,TurbSC,LDO.) %>%
+  filter(!is.na(value)) %>%
+  transform(value = as.numeric(value)) %>%
+  # remove pH data; probes not functional in 2020
+  select(-pH) %>%
+  distinct()
+
+```
+
+<br>
+
+Plot original turbidity data
+```{r}
+
+# rename hydrolab sites for plots
+HydrolabSites <- c("FirstBridge" = "First Bridge, Upstream of Fire (Mile 37.7)", "Mile28" = "Downstream of Fire (Mile 28)")
+
+# plot original turbidity data
+hydrolabs %>%
+  filter(Parameter == "TurbSC") %>%
+  ggplot(aes(DateTime,value)) +
+  geom_point() +
+  facet_wrap(SiteID ~ ., labeller = labeller(SiteID = HydrolabSites),ncol = 1) +
+  theme_bw() +
+  ggtitle("") +
+  xlab("") +
+  ylab("Turbidity (NTU)") +
+  theme(strip.text = element_text(size = 14)) +
+  ggtitle("Preliminary Turbidity Data, Summer 2020\nChena River Mainstem\nAbove vs. Below Nugget Creek Fire")
+
+```
+
+<br>
+
+We used the above plot to manually identify likely erroneous data.  We created an excel file listing start and stop times of data to be excised, and specified individual observations to be removed.
+```{r }
+
+# read in table of manually ID'd data to be removed
+excise_data <- read_excel("data/Hydrolabs/chena_hydrolabs_excise.xlsx", sheet = "Sheet1") %>%
+  gather(period,time,DateTime_Start1:DateTime_End3) %>%
+  mutate(time = as.POSIXct(time)) %>%
+  spread(period,time)
+
+# for more efficient code, want to figure out how to conditionally select columns if name contains "Date" and transform to POSIXct class
+
+# join excise table with original temperatures
+# try one parameter at a time....
+hydrolabs <- hydrolabs %>%
+  left_join(excise_data, by = c("Parameter","SiteID")) %>%
+  mutate(row = as.character(row_number())) %>%
+# remove erroneous manually ID'd in spreadsheet, but leave their timestamp row present for ggplot reference
+  mutate(excise = case_when(DateTime >= DateTime_Start1 &
+                              DateTime <= DateTime_End1 ~ "Y")) %>%
+  filter(is.na(excise)) %>%
+    mutate(excise = case_when(DateTime >= DateTime_Start2 &
+                              DateTime <= DateTime_End2 ~ "Y")) %>%
+    filter(is.na(excise)) %>%
+    mutate(excise = case_when(DateTime >= DateTime_Start3 &
+                              DateTime <= DateTime_End3 ~ "Y")) %>%
+  filter(is.na(excise)) %>%
+  filter(row !="24668") %>%
+  filter(row != "24301") %>%
+  filter(row != "25152") %>%
+  filter(row != "19151") %>%
+  filter(row != "24000") %>%
+  filter(row != "19663")
+ 
+# having some substantial trouble with code syntax trying to specify which observations to remove; code is wonky; fix later if time allows
+
+```
+
+<br>
+
+### Turbidity plot
+
+Plot cleaned-up turbidity data
+```{r}
+hydrolabs %>%
+  filter(Parameter == "TurbSC") %>%
+  ggplot(aes(DateTime,value)) +
+  geom_point() +
+  facet_wrap(SiteID ~ ., labeller = labeller(SiteID = HydrolabSites),ncol = 1) +
+  theme_bw() +
+  ggtitle("") +
+  xlab("") +
+  ylab("Turbidity (NTU)") +
+  theme(strip.text = element_text(size = 14)) +
+  ggtitle("Corrected Turbidity Data, Summer 2020\nChena River Mainstem\nAbove vs. Below Nugget Creek Fire")
+
+#save
+ggsave("output/figures/hydrolabs/hydrolabs_turbidity.png")
+
+```
+
+<br>
+
+### Summary table
+
+Create summary table
+```{r}
+(hydrolabs_summ <- hydrolabs %>%
+  filter(Parameter == "TurbSC",
+         !is.na(value)) %>%
+  mutate(week = week(DateTime)) %>%
+  group_by(SiteID,week) %>%
+  summarise(nObs = n(),
+            meanTurb = mean(value),
+            sdTurb = sd(value),
+            seTurb = sdTurb / sqrt(nObs)))
+
+# save
+write_csv(hydrolabs_summ,"output/tables/hydrolabs/2020_hydrolabs_summary.csv")
+```
+<br>
+
+There are a maximum of 672 observations per week/site.  Exclude weeks w/ <400 observations and compare between the two sites.
+
+<br>
+
+### Weekly boxplot
+
+```{r}
+#create general plot object
+
+# plot
+hydrolabs %>%
+  mutate(week = as.factor(week(DateTime))) %>%
+  filter(Parameter == "TurbSC") %>%
+  ggplot(aes(week,value, color = as.factor(SiteID))) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("Week") +
+  ylab("Turbidity (NTU") +
+  ggtitle("Chena Mainstem Turbidity") +
+  labs(color = "Site ID")
+
+# save
+ggsave("output/figures/hydrolabs/hydrolabs_turbidity_boxplot.png")
+
+```
+
+<br>
+
+### Discussion
+
+Discussion: we would anticipate mainstem turbidity to be higher throughout the summer at the Mile 28 site (downstream of the 2019 wildfire scar influence).  Due to technical issues with sonde function, data sets are not continuous throughout the summer at both sites.  An initial visualization does not provide obvious evidence for consistent patterns of difference between the two sites using Hydrolab sonde data.
+
+To do: compare to historical data from 2008/2009 at similar site(s).
+
+<br>
