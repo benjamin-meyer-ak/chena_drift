@@ -1,0 +1,225 @@
+---
+title: "Chena Fire & Drift\n Exploratory Data Analysis 2020"
+output:
+  html_document: 
+    df_print: paged
+    fig_width: 10
+    fig_height: 6
+    fig_caption: yes
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+editor_options: 
+  chunk_output_type: inline
+---
+Website last updated `r Sys.time()` by Benjamin Meyer (bemeyer@alaska.edu)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+
+```{r initialize script, include=FALSE}
+
+# clear environment
+rm(list=ls())
+
+#require packages
+library(googlesheets)
+library(tidyverse)
+library(hms)
+library(janitor)
+library(lubridate)
+
+```
+
+<br>
+
+<iframe src="https://drive.google.com/file/d/1xyt8j4ivxhsnB0CxEd2rRo2Zttp8Gqjl/preview" width="640" height="480"></iframe>
+
+*Headwater tributary of the Chena River in the 2019 Nugget Creek Fire scar.  Photo from July 2020.*
+
+***
+
+<br>
+
+### Introduction
+
+This document will outline preliminary results from exploratory data analysis from UAF/SFR's ongoing Chena Fire/Drift 2020 research
+
+***
+
+<br>
+
+### People
+
+##### Principal Investigator
+
+* Dr. Erik Schoen, UAF (https://www.researchgate.net/profile/Erik_Schoen)
+
+##### Co-Principal Investigators
+
+* Dr. Jason Neuswanger, SFR (http://www.jasonneuswanger.com/)
+* Dr. Carol Volk, SFR (https://southforkresearch.org/)
+* Dr. Mark Wipfli, UAF (http://people.iab.uaf.edu/mark_wipfli)
+* Brian McKenna, TCC
+
+##### Other Personnel
+
+* Benjamin Meyer, UAF (https://www.researchgate.net/profile/Benjamin_Meyer8)
+* Erick De La Rosa, UAF
+* Michelle Quillen, UAF
+* Will Samuel, UAF
+* Justin Hill, SFR
+* Debra Lynne, TCC
+
+##### Useful Links
+
+* Overview of precision drift sampling fieldwork
+
+  + http://www.southforkresearch.org/2020_field_tech.html
+  + https://www.youtube.com/watch?v=5whZhZUvwdo&feature=youtu.be
+
+<br>
+
+***
+
+<br>
+
+### Methods
+
+##### Study Area
+
+* Map of study area and field sites
+
+  + View map on ArcGIS Online at https://arcg.is/04brTu
+  + View coordinates for all sites at http://bit.ly/chenadriftcoordinates
+
+<style>.embed-container {position: relative; padding-bottom: 80%; height: 0; max-width: 100%;} .embed-container iframe, .embed-container object, .embed-container iframe{position: absolute; top: 0; left: 0; width: 100%; height: 100%;} small{position: absolute; z-index: 40; bottom: 0; margin-bottom: -15px;}</style><div class="embed-container"><iframe width="400" height="300" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" title="Chena Drift/Fire" src="//www.arcgis.com/apps/Embed/index.html?webmap=5f7eef523b844314b79085429a72cd89&extent=-147.5065,64.6816,-146.2033,64.9876&zoom=true&previewImage=false&scale=true&disable_scroll=true&theme=light"></iframe></div>
+
+***
+    
+<br>
+
+##### Field Sampling Effort
+
+<br>
+
+When and where did in-situ aquatic ecology data collection occur, and by whom?
+
+  + Main stem drift (SFR 2019-2020, UAF 2020)
+```{r}
+# Will import from J. Neuswanger Python output results.  B Meyer will use to create/display summary table of sampling efforts here
+```
+  + Headwaters drift (UAF 2020)
+```{r}
+# Will import from J. Neuswanger Python output results.  B Meyer will use to create/display summary table of sampling efforts here
+```
+   + Juvenile Chinook fishing effort (SFR 2019-2020, UAF 2020)
+```{r}
+# Import Excel sheet from Dropbox, "Fishing Data 2020.xlsx".  
+# a.) Create simple bar chart of catch by site faceted by week
+# b.) Create plot of CPUE vs time for MT and dipnets, faceted by Upper vs. Lower river
+```
+  + Water temperature logger data, (UAF/SFR 2019 & 2020)
+```{r}
+# Import Excel sheet from dropbox, "/Users/bmeyer/Dropbox_auxiliary/Dropbox/Chena_Data_2020/UAF_Data/2020_Logger_Downloads/HOBO_Final_Data".  Create summary figure displaying temporal extent of various loggers and their parameters.
+```
+  + Hydrolab Sonde turbidity, DO, conductivity, and water temperature data, (UAF 2008, 2009, 2020)
+```{r}
+# Import Excel sheet from dropbox, "/Users/bmeyer/Dropbox_auxiliary/Dropbox/Chena_Data_2020/UAF_Data/2020_Logger_Downloads/Hydrolab_Final_Data"
+# read in 2020 Hydrolab data in progress
+
+```
+  
+<br>  
+
+##### Remote Sensing Data collection
+
+When and where did remote sensing data collection occur, and by whom?  
+  
+  + Drone aerial imagery (UAF/TCC 2020)
+    + Drone Footage from 6/29/2020 of Chena Mainstem Drift Sampling [https://drive.google.com/drive/u/0/folders/1xaSedWQSAMwjPAbvkAYaH8gsdCRZUjoZ]
+    
+```{r}
+# Summary table of dates & extent of aerial imagery data collected
+```
+  + Remote sensing of watershed vegetation composition and % of watershed burned (UAF 2020)
+```{r}
+# Currently in discussion with potential collaborator(s) Dr. Alison York and Dr. Santosh Pandya
+```
+
+
+
+
+
+
+<br>
+  
+##### Laboratory Data Collection Effort
+
+How many samples were processed, and what type?
+
+  + Coarse fraction
+```{r}
+# share in-text result from J. Neuswangers Python output table
+```
+  + Fine Fraction
+```{r}
+# share in-text result from J. Neuswangers Python output table
+```
+
+<br>
+
+***
+
+<br>
+
+### Results
+
+##### Headwaters Tributaries
+
+* Were habitat conditions distinct in recent burn vs. old burn tributaries?
+
+  + Parameters
+    + Drift debris density
+    + Invertebrate density
+    + Prey energy density
+    + Water temperature
+    + Turbidity
+    + Others
+    
+    
+##### Chena Mainstem
+
+* Were habitat conditions distinct in the main stem upstream vs. downstream of the 2019 Nugget Creek fire?
+
+  + Parameters
+    + Drift debris density
+    + Invertebrate density
+    + Prey energy density
+    + Water temperature
+      + Preliminary draft results at https://rpubs.com/bmeyer/watertemps1
+    + Turbidity
+      + Preliminary draft results at https://rpubs.com/bmeyer/sondes2020
+    + Juvenile Chinook salmon growth rate
+      + Preliminary draft at https://rpubs.com/bmeyer/chena_chinookgrowth
+```{r}
+# Import  Excel sheet from dropbox, "Fish Datasheet 2020.xlsx".  Create plot(s) of mean FL vs time, a.) all sites combined and b.) by lower vs. upper river c.) by year
+```
+  
+***
+
+### Photos
+
+Various fieldwork photos found at: https://drive.google.com/drive/folders/11uDSnF9GssjUBe2RUwTEeC1RAgKMVY2p?usp=sharing 
+
+<br>
+
+### Permit Reports Data
+
+Find more at https://rpubs.com/bmeyer/chenafiredriftpermits

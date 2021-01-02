@@ -1,0 +1,242 @@
+---
+title: "2019 Drift Energy Density Results"
+output:
+  html_document: 
+    df_print: paged
+    fig_width: 10
+    fig_height: 6
+    fig_caption: yes
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+editor_options: 
+  chunk_output_type: inline
+---
+Website last updated `r Sys.time()` by Benjamin Meyer (bemeyer@alaska.edu)
+
+<br>
+
+### Introduction
+This document will summarize and plot results from drift invertebrate samples collected in 2019 by South Fork Research.
+
+<br>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# set data source directory
+#knitr:: opts_knit$set(root.dir = "location")
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+```
+
+<br>
+
+
+```{r initialize script, include=FALSE}
+
+# clear environment
+rm(list=ls())
+
+#require packages
+library(googlesheets)
+library(tidyverse)
+library(hms)
+library(janitor)
+library(lubridate)
+library(anytime)
+library(readxl)
+library(leaflet)
+library(DT)
+library(GGally)
+
+# set plot theme
+theme_set(theme_bw(12))
+
+# prep linear model formula labels
+library(ggpubr)
+
+## formula structure
+formula <- y ~ x
+
+## formula and r2 labels
+formula_labels <- stat_regline_equation(aes(label = paste("atop(",..eq.label.., ",", ..adj.rr.label.., ")", sep = "")),
+              formula = formula, 
+               rr.digits = 2, 
+               coef.digits = 2, 
+               parse = TRUE,
+               size = 3,
+               geom = "label", 
+               alpha = 0.8)
+
+
+# set user
+#user <- "/Users/bmeyer/"
+
+# set x axis format
+xaxis <- scale_x_continuous(breaks = c(136,166,196,227),
+                     labels = c("May 15","Jun 15","Jul 15","Aug 15")) 
+```
+
+<br>
+
+### Import data
+```{r}
+# import and prep for examination
+drift_dat <- read.csv("data/Drift energy density/2019 Results from JN/Total Drift by Sample with Correlates.csv") %>%
+  transform(DateTime = mdy_hm(DateTime)) %>%
+  mutate(day = yday(DateTime))
+
+# define mainstem sites
+ms_sites <- c("Nordale","First Bridge","Third Bridge")
+
+```
+
+<br>
+
+### Select Variables vs Time By Site
+```{r}
+# plot all sites
+drift_dat %>%
+  ggplot(aes(day,PreyToDebrisRatio)) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("Prey to Debris Ratio 2019 - All Sites") +
+  xaxis
+
+# plot 3 sites
+drift_dat %>%
+  filter(Site %in% ms_sites) %>%
+  ggplot(aes(day,PreyToDebrisRatio)) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("Prey to Debris Ratio 2019 - Mainstem Sites") +
+  xaxis
+  
+```
+<br>
+
+```{r}
+# plot
+drift_dat %>%
+  ggplot(aes(day,Concentration)) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("Concentrations by Site 2019 - All Sites") +
+  xaxis
+  
+# plot mainstem sites
+drift_dat %>%
+  filter(Site %in% ms_sites) %>%
+  ggplot(aes(day,Concentration)) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("Concentrations by Site 2019 - Mainstem Sites") +
+  xaxis
+  
+```
+<br>
+
+```{r}
+# plot
+drift_dat %>%
+  ggplot(aes(day,(Energy/FlowNormalized))) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("Energy Density vs Time by Site -- All Sites") +
+  xaxis
+
+# plot
+drift_dat %>%
+  filter(Site %in% ms_sites) %>%
+  ggplot(aes(day,(Energy/FlowNormalized))) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("Energy Density vs Time by Site -- Mainstem Sites") +
+  xaxis
+  
+```
+
+<br>
+
+```{r}
+# plot
+drift_dat %>%
+  ggplot(aes(day,LogConcentration)) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("LogConcentration by Site 2019 -- All Sites") +
+  xaxis
+
+# plot
+drift_dat %>%
+  filter(Site %in% ms_sites) %>%
+  ggplot(aes(day,LogConcentration)) +
+  geom_point() +
+  facet_wrap(.~ Site) +
+  ggtitle("LogConcentration by Site 2019 -- Mainstem Sites") +
+  xaxis
+  
+```
+
+<br>
+
+***
+
+
+##### Improved graphic of time vs. LogConcentration
+```{r}
+
+# plot
+drift_dat %>%
+  filter(Site %in% ms_sites) %>%
+  ggplot(aes(day,LogConcentration)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(.~ Site) +
+  formula_labels +
+  ggtitle("LogConcentration by Site 2019") +
+  xaxis +
+  xlab("")
+```
+<br>
+
+***
+
+### Pairs Plots
+```{r}
+
+# enviro correlates
+drift_dat %>%
+  select("Temperature",
+         "Turbidity",
+         "Windspeed",
+         "MaxWindspeed",
+         "Rainfall",
+         "Light",
+         "BoatWakes",
+         "day") %>%
+  ggpairs() +
+  ggtitle("Environmental Correlates")
+```
+
+<br>
+
+```{r}
+# drift density correlates
+drift_dat %>%
+  select("Turbidity",
+         "Concentration",
+         "Energy",
+         "FlowNormalized",
+         "LogConcentration",
+         "PreyToDebrisRatio", 
+         "day") %>%
+  ggpairs() +
+  ggtitle("Drift Density Correlates")
+
+```
+
+To do: look in to EDA approaches described in https://arxiv.org/abs/1904.02101

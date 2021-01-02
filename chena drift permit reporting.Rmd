@@ -1,0 +1,402 @@
+---
+title: "Chena Drift Permit Reporting"
+output:
+  html_document: 
+    df_print: paged
+    fig_width: 10
+    fig_height: 6
+    fig_caption: yes
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+editor_options: 
+  chunk_output_type: inline
+---
+Website last updated `r Sys.time()` by Benjamin Meyer (bemeyer@alaska.edu)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+
+```{r initialize script, include=FALSE}
+
+# clear environment
+rm(list=ls())
+
+#require packages
+library(googlesheets)
+library(tidyverse)
+library(hms)
+library(janitor)
+library(lubridate)
+library(readxl)
+library(DT)
+library(readr)
+
+# set plotting theme
+theme_set(theme_bw(12))
+
+# if editing this document, set user to access source files
+#user <- "/Users/bmeyer/"
+
+# set data source directory for fish data
+#source_directory <- paste0(user,"Dropbox/Chena_Data_2020/Chena Drift Project Data_SFR/UAF Chena Drift Data/Fish/")
+
+```
+
+<br>
+
+### Introduction
+
+This document will generate permit reports from the Chena Drift/Fire project 2019-2020
+
+* ADFG
+* INAD
+* IACUC
+
+<br>
+
+### Import data
+
+Click on "Code" to see import process
+```{r}
+# read in data from dropbox directory
+
+## 2019
+sites2019 <- read_excel("data/Fish/2019/2019 Data Inputs/Chinook catch 2019.xlsx", sheet = "Sites") %>%
+  mutate(`General Area` = "Upper Chena Mainstem")
+fish2019 <- read_excel("data/Fish/2019/2019 Data Inputs/Chinook catch 2019.xlsx", sheet = "Fish")
+
+## 2020
+sites2020 <- read_excel("data/Fish/2020/2020 Data Inputs/Fishing Data 2020.xlsx", sheet = "Fishing_Sites") %>%
+  select(GPSwpt, Lat, Lon, `General Area`)
+fish2020 <- read_excel("data/Fish/2020/2020 Data Inputs/Fish Datasheet 2020.xlsx", skip = 3)
+
+# Clean up and summarize 2019 data----------
+## Convert 2019 data date to date format and join with site data
+fish2019  <- fish2019 %>%
+  mutate(Date = ymd(Date)) %>%
+  left_join(sites2019, by = "GPSwpt") %>%
+  select(-DatasheetOrder,-TL_mm,-Description) %>%
+  rename(General.Area = `General Area`)
+
+# General Note: do not alter 2019 data formats, because J. Neuswager and E. Schoen may be already using these sheets as is for other script analyses.  Instead, make 2020 data conform to 2019 formats.
+
+# reformat 2020 data to join with 2019 data
+fish2020 <- fish2020 %>%
+  rename(GPSwpt = Site,
+         ObserverName = Observer,
+         FL_mm = `FL (mm)`,
+         Wt_g = `Wt (g)`,
+         Mortality = `Mort?`) %>%
+  select(-`Disposition (MR/ID)`, -`Data Entry`,-`Addl. Count`,-Count) %>%
+  left_join(sites2020, by = "GPSwpt") %>%
+  transform(FL_mm = as.numeric(FL_mm),
+            Wt_g = as.numeric(Wt_g),
+            Lat = as.character(Lat),
+            Lon = as.character(Lon))  
+
+# join 2019 and 2020 data
+fish <- bind_rows(fish2019,fish2020) %>%
+  mutate(year = year(Date)) 
+```
+
+<br>
+
+#### Overall catch by date/species
+```{r}
+datatable(totalCatchByDate <- fish %>%
+  group_by(Species, Date) %>%
+  summarize(TotalCatch = sum(Number)) %>%
+  arrange(Species,Date))
+```
+
+<br>
+
+#### Overcall catch by species and year
+```{r}
+# Check how many of each species were captured
+datatable(totalCatch <- fish %>%
+  group_by(Species,year) %>%
+  summarize(TotalCatch = sum(Number)) %>%
+  arrange(year,Species))
+
+```
+
+***
+
+### INAD reporting 2020
+
+```{r}
+# INAD-----(did this in Excel in 2019, but done this in R for 2020. B Meyer copied example from 2019 Excel format, found at ./Fish/Permit Reports/2019 Permit Reports) to generate R results here.
+
+# 2020 INAD report
+# create general summary table
+inad.table <- fish %>%
+  filter(year == 2020) %>%
+  group_by(Date,GPSwpt,Species,Number,`Aqui.S.bath.`) %>%
+  summarise(Fish.Per.Treatment = sum(Number)) %>%
+  ungroup() %>%
+  select(-Number)
+
+# a fresh aqui-s bath was mixed at each unique instance of site/date where Chinook and/or chum were
+# captured.  Create table describing creation order of aqui-s solution batches.
+treatments <- fish %>%
+  filter(year == 2020,
+         Species %in% c("Chinook","Chum")) %>%
+  group_by(Date,GPSwpt) %>%
+  summarise(Fish.Per.Treatment = sum(Number)) %>%
+  ungroup() %>%
+  mutate(Treatment.Number = row_number()) %>% 
+  select(-Fish.Per.Treatment) 
+```
+
+<br>
+
+#### INAD Summary Table 1
+
+Aqui-S use by Species, Site, and Date
+```{r}
+# join tables and create new columns to create INAD Summary Table 1
+## grouped by species, site, and date
+datatable(inad.summary.table.1 <- left_join(inad.table,treatments) %>%
+            #filter(Species == "Chinook") %>%
+  mutate(`Level of Anesthesia` = "Light (measure and weigh)",
+         `Dose (mg/L)` = 20,
+         `Time To Anesthesia (Min:Sec)` = "3:00",
+         `Time To Recover (Min)` = "5:00",
+         Principal_Investigator = "Erik Schoen (eschoen@alaska.edu")) 
+
+# save summary table 1
+write.csv(inad.summary.table.1,"output/tables/permit reports/AquiS_BySite_2020.csv",row.names = F)
+
+```
+
+<br>
+
+#### INAD Summary Table 2
+
+Aqui-S use by Site and Date
+```{r}
+# create INAD Summary Table 2
+## calculate daily quantities of aqui-s used at X number of sites
+datatable(inad.summary.table.2 <- inad.summary.table.1 %>%
+  distinct(Date,GPSwpt) %>%
+  group_by(Date) %>%
+  summarise(number_sites = n()) %>%
+  mutate(`Total Quantity Aqui-S Used (mL)` = number_sites,
+         Principal_Investigator = "Erik Schoen (eschoen@alaska.edu"))
+
+# save
+write.csv(inad.summary.table.2,"output/tables/permit reports/AquiS_BySite_2020.csv",row.names = F)
+
+```
+
+<br>
+
+```{r include=F}
+(quant2020 <- sum(inad.summary.table.2$`Total Quantity Aqui-S Used (mL)`))
+```
+
+* **Total quantity Aqui-S used in 2020 was `r quant2020` mL.**
+
+<br>
+
+***
+
+### ADFG Fish Use Permit Reports data
+
+#### Daily and annual mortality 
+
+##### 2019
+
+```{r}
+
+# ADFG-------
+# Create report for Fish Use Permit
+# Check whether an instance of > 10% unintended collecting mortality occurred (requires contacting AMB)
+datatable(mort19 <- fish %>%
+  filter(year == 2019) %>%
+  ungroup() %>%
+  group_by(Date, Mortality,year) %>%
+  summarize(Total = sum(Number)) %>%
+  spread(Mortality, Total) %>%
+  rename(N = `<NA>`) %>%
+  mutate(pct_mort = (Y / N)*100))
+
+# summarise overall mortality rate
+(mort19_overall <- mort19 %>%
+  ungroup() %>%
+  summarise(sum_mort = sum(Y, na.rm = T),
+            sum_non_mort = sum(N)) %>%
+  mutate(overall_mort_pct = (sum_mort / sum_non_mort)*100))
+```
+
+<br>
+
+* **For 2019, the max daily mortality rate was 2.72% (7/26/19), and overall 2019 rate was 1.6%**
+
+<br>
+
+##### 2020
+
+```{r}
+# calculate 2020 mortality rates
+datatable(mort20 <- fish %>%
+    filter(year == 2020) %>%
+    ungroup() %>%
+    group_by(Date, Mortality,year) %>%
+    summarize(Total = sum(Number)) %>%
+    spread(Mortality, Total) %>%
+    rename(N = `<NA>`) %>%
+    mutate(pct_mort = (Y / N)*100))
+
+# summarise overall mortality rate
+(mort20_overall <- mort20 %>%
+    ungroup() %>%
+    summarise(sum_mort = sum(Y, na.rm = T),
+              sum_non_mort = sum(N)) %>%
+    mutate(overall_mort_pct = (sum_mort / sum_non_mort)*100))
+
+```
+
+<br>
+
+* **For 2020, the max daily mortality rate was 1.67% (6/3/20), and overall 2020 rate was 0.15%**
+
+<br>
+
+***
+
+#### Aquatic Resource Permit reports 
+
+##### 2019
+```{r}
+# Generate output table for 2019 ADFG ARP report
+datatable(adfg19 <- fish %>%
+  filter(year == 2019) %>%
+  mutate(Location.ID = NA,
+         Latitude = Lat,
+         Longitude = Lon,
+         Datum = "WGS84",
+         Coordinate.determination.method = "MAP",
+         Name.of.water.body = "Chena River",
+         Date = format(Date, "%m/%d/%Y"),
+         Observer.name = ObserverName,
+         Fish.collection.method = Gear,
+         Species = ifelse(Species == "Chinook", "Chinook salmon",
+                          ifelse(Species == "Chum", "chum salmon",
+                                 ifelse(Species == "Sculpin", "Slimy sculpin", Species))),
+         Life.stage = "juvenile",
+         Length.mm = FL_mm,
+         Length.method = ifelse(is.na(Length.mm), NA, "Fork"),
+         Weight.g = Wt_g,
+         Sex = NA,
+         Age = NA,
+         Age.method = NA,
+         ADFG.GCL = NA,
+         Additional.count.1 = ifelse(Number == 1, NA, Number),
+         Disposition.1 = ifelse(is.na(Mortality),
+                                ifelse(is.na(Length.mm), "ID'ed and Released", 
+                                       "Measured and Released"),
+                                "Unintended Mortality"),
+         Additional.count.2 = NA,
+         Disposition.2 = NA,
+         Anesthesia_Sedative.Used = ifelse(is.na(Length.mm), NA, "Aqui-S 20E"),
+         Comments = NA) %>%
+  select(Location.ID:Name.of.water.body, Date, Observer.name, Fish.collection.method, Species, 
+         Life.stage:Comments))
+
+# write 2019 ADFG report data to local dropbox directory
+write_excel_csv(adfg19, "output/tables/permit reports/ADFG Permit Data 2019.csv", na = "")
+
+```
+
+<br>
+
+##### 2020
+```{r}
+
+# Generate output table for 2020 ADFG ARP report
+datatable(adfg20 <- fish %>%
+  filter(year == 2020) %>%
+  mutate(Location.ID = NA,
+         Latitude = Lat,
+         Longitude = Lon,
+         Datum = "WGS84",
+         Coordinate.determination.method = "MAP",
+         Name.of.water.body = "Chena River",
+         Date = format(Date, "%m/%d/%Y"),
+         Observer.name = ObserverName,
+         Fish.collection.method = Gear,
+         Species = ifelse(Species == "Chinook", "Chinook salmon",
+                          ifelse(Species == "Chum", "chum salmon",
+                                 ifelse(Species == "Sculpin", "Slimy sculpin", Species))),
+         Life.stage = "juvenile",
+         Length.mm = FL_mm,
+         Length.method = ifelse(is.na(Length.mm), NA, "Fork"),
+         Weight.g = Wt_g,
+         Sex = NA,
+         Age = NA,
+         Age.method = NA,
+         ADFG.GCL = NA,
+         Additional.count.1 = ifelse(Number == 1, NA, Number),
+         Disposition.1 = ifelse(is.na(Mortality),
+                                ifelse(is.na(Length.mm), "ID'ed and Released", 
+                                       "Measured and Released"),
+                                "Unintended Mortality"),
+         Additional.count.2 = NA,
+         Disposition.2 = NA,
+         Anesthesia_Sedative.Used = ifelse(is.na(Length.mm), NA, "Aqui-S 20E"),
+         Comments = NA) %>%
+  mutate(Observer.name = str_replace(Observer.name, "ES","Erik Schoen"),
+         Observer.name = str_replace(Observer.name, "JH","Justin Hill"),
+         Observer.name = str_replace(Observer.name, "MQ","Michelle Quillen"),
+         Observer.name = str_replace(Observer.name, "ED","Erick De La Rosa"),
+         Observer.name = str_replace(Observer.name, "EDLR","Erick De La Rosa"),
+         Observer.name = str_replace(Observer.name, "RosaLR","Rosa"),
+         Observer.name = str_replace(Observer.name, "WS","Will Samuel"),
+         Observer.name = str_replace(Observer.name, "BM","Benjamin Meyer"),
+         Fish.collection.method = str_replace(Fish.collection.method, "MT","Minnow Trap")) %>%
+  select(Location.ID:Name.of.water.body, Date, Observer.name, Fish.collection.method, Species, 
+         Life.stage:Comments))
+
+# Note : coordinates are not included for South Fork MT 1 and South Fork MT 2 sites.  Unable to diagnose as of 9/25/20.  Fix manually in excel spreadsheet for now. Excel spreadsheet created on 9/25/20 is up to date.
+
+# write 2020 ADFG report data to local dropbox directory
+# write_excel_csv(adfg20, "Permit Reports/2020 Permit Reports/ADFG Permit Data 2020.csv", na = "")
+```
+
+<br>
+
+***
+
+### IACUC
+
+Generate summary data for IACUC report
+```{r}
+# IACUC--------
+# Calculate how many Chinook were "used", i.e., anesthetized, measured, and released. Don't count
+# the fish that were only ID'd and released (but do count all unintended mortalities even if not
+# measured).
+datatable(iacuc <- bind_rows(adfg19,adfg20) %>%
+  transform(Date = mdy(Date)) %>%
+  mutate(year = year(Date)) %>%
+  filter(Species == "Chinook salmon") %>%
+  # Remove the fish that were not measured or weighed or unintended morts
+  # filter(!is.na(FL_mm) | !is.na(Wt_g) | Mortality == "Y") %>% 
+  mutate(Number = ifelse(is.na(Additional.count.1), 1, Additional.count.1)) %>%
+  group_by(Disposition.1,year) %>%
+  summarize(Count = sum(Number, na.rm = T)))
+
+#save
+write_csv(iacuc,"output/tables/permit reports/iacuc_permit_data.csv")
+
+```
+
+
