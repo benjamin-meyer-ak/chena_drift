@@ -15,7 +15,7 @@ output:
 editor_options: 
   chunk_output_type: inline
 ---
-Website last updated `r Sys.time()` by Benjamin Meyer (bemeyer@alaska.edu)
+Website last updated `r Sys.time()` by Erik Schoen (eschoen@alaska.edu)
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -386,17 +386,23 @@ Generate summary data for IACUC report
 # measured).
 datatable(iacuc <- bind_rows(adfg19,adfg20) %>%
   transform(Date = mdy(Date)) %>%
-  mutate(year = year(Date)) %>%
-  filter(Species == "Chinook salmon") %>%
+  mutate(year = year(Date),
+         protocol = ifelse(Date >= ymd(20200826), "Chena Fire", "Chena Drift")) %>%
+  filter(Species == "Chinook salmon" | Species == "Slimy sculpin") %>%
   # Remove the fish that were not measured or weighed or unintended morts
   # filter(!is.na(FL_mm) | !is.na(Wt_g) | Mortality == "Y") %>% 
   mutate(Number = ifelse(is.na(Additional.count.1), 1, Additional.count.1)) %>%
-  group_by(Disposition.1,year) %>%
+  group_by(Disposition.1,year, protocol) %>%
   summarize(Count = sum(Number, na.rm = T)))
 
 #save
 write_csv(iacuc,"output/tables/permit reports/iacuc_permit_data.csv")
 
+# Calculte mortality rates by IACUC protocol (Chinook only)
+# Chena drift 2020:
+mort.drift.2020 <- 1/634
+# Chena drift project had < 0.2% mortality (1/634)
+# Chena fire project had zero mortality
 ```
 
 

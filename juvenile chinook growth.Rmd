@@ -31,7 +31,7 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 <br>
 
 ### Introduction
-This document will summarize and plot observed growth of juvenile Chinook salmon in the Chena River.  Data is primarily from summers 2019-2020, with some comparisons to data from summers 2008 2009 (Benson et al.), and 2015 (Huntsman and Falke et al).
+This document will summarize and plot observed growth of juvenile Chinook salmon in the Chena River.  Data is primarily from summers 2019-2020, with some comparisons to data from summers 2008 & 2009 (Gutierrez 2011), and 2015 (Huntsman and Falke et al).
 
 <br>
 
@@ -48,6 +48,7 @@ rm(list=ls())
 # Load packages and read in data---------
 library(tidyverse)
 library(readxl)
+library(lubridate)
 
 # set ggplot theme
 theme_set(theme_bw(12))
@@ -86,6 +87,7 @@ fish2019  <- fish2019 %>%
 
 # reformat 2020 data to join with 2019 data
 fish2020 <- fish2020 %>%
+  mutate(Date = ymd(Date)) %>%
   rename(GPSwpt = Site,
          ObserverName = Observer,
          FL_mm = `FL (mm)`,
@@ -411,14 +413,14 @@ plot_theme <- theme(
 
 # plot
 growthWt.plot.all <- growth.summary.all %>%
-  filter(General.Area != "Lower Chena Mainstem") %>%
+  filter(Year != 2008,General.Area != "Lower Chena Mainstem") %>%
   ggplot(aes(x = DOY, y = meanWt, color = Year)) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = meanWt - seWt, ymax = meanWt + seWt), size = 0.5) +
  # scale_x_date(name = "Date") +
   scale_y_continuous(name = "Weight (g)", breaks = c(0:6)) +
-  ggtitle("Chena River Juvenile Chinook Salmon Weights 2009 - 2020") +
+  # ggtitle("Chena River Juvenile Chinook Salmon Weights 2009 - 2020") +
   xlab("") +
   scale_x_continuous(breaks = c(152,182,213,244),
                      labels = c("June","July","August","Sept")) +

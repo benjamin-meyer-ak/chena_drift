@@ -1,7 +1,9 @@
-Disposition.1,year,Count
-ID'ed and Released,2019,810
-ID'ed and Released,2020,208
-Measured and Released,2019,1310
-Measured and Released,2020,1050
-Unintended Mortality,2019,34
-Unintended Mortality,2020,1
+Disposition.1,year,protocol,Count
+ID'ed and Released,2019,Chena Drift,811
+ID'ed and Released,2020,Chena Drift,160
+ID'ed and Released,2020,Chena Fire,137
+Measured and Released,2019,Chena Drift,1310
+Measured and Released,2020,Chena Drift,633
+Measured and Released,2020,Chena Fire,419
+Unintended Mortality,2019,Chena Drift,34
+Unintended Mortality,2020,Chena Drift,1
